@@ -1,35 +1,36 @@
 # LXC 101 — Core Infrastructure
 
-LXC 101 merupakan container yang menjalankan layanan infrastruktur inti yang menjadi dependency utama bagi service lain dalam environment homelab.
+LXC 101 merupakan container yang menjalankan layanan infrastruktur inti yang menjadi foundation bagi seluruh environment homelab.
 
 ## Container Information
 
-| Component        | Details                |
-| ---------------- | ---------------------- |
-| CT ID            | 101                    |
-| Hostname         | `core-infra`           |
-| Operating System | Ubuntu 24.04 LTS       |
-| CPU              | 2 cores                |
-| Memory           | 768MB RAM + 512MB Swap |
-| Storage          | 8GB (`local-lvm`)      |
-| Type             | Unprivileged LXC       |
-| Docker Support   | Nesting enabled        |
+| Component | Details |
+|---|---|
+| CT ID | 101 |
+| Hostname | `core-infra` |
+| Operating System | Ubuntu 24.04 LTS |
+| CPU Allocation | 2 cores |
+| Memory | 768MB RAM + 512MB Swap |
+| Storage | 8GB (`local-lvm`) |
+| Container Type | Unprivileged LXC |
+| Docker Support | Nesting enabled |
 
 ## Network Configuration
 
-| Configuration | Value                |
-| ------------- | -------------------- |
-| IP Address    | `192.168.100.101/24` |
-| Gateway       | `192.168.100.1`      |
-| DNS Server    | `1.1.1.1`            |
-| Search Domain | `homelab.local`      |
+| Configuration | Value |
+|---|---|
+| IP Address | `192.168.100.101/24` |
+| Gateway | `192.168.100.1` |
+| DNS Server | `1.1.1.1` |
+| Search Domain | `homelab.local` |
 
 > LXC 101 menggunakan external DNS dan tidak menggunakan Pi-hole sebagai DNS resolver untuk menghindari circular dependency. Detail desain DNS dijelaskan pada `Infrastructure/network.md`.
 
 ## Service Architecture
 
-LXC 101 menyediakan beberapa layer infrastruktur inti yang menjadi foundation bagi seluruh environment homelab.
+LXC 101 menyediakan beberapa layer infrastruktur yang menjadi foundation bagi seluruh environment homelab.
 
+```text
                  LXC 101 — Core Infrastructure
                             |
           ┌─────────────────┼─────────────────┐
@@ -43,57 +44,51 @@ LXC 101 menyediakan beberapa layer infrastruktur inti yang menjadi foundation ba
            Dashboard Layer     Monitoring Layer
                   |                   |
               Homepage          Uptime Kuma
+```
 
 Setiap layer memiliki tanggung jawab yang berbeda:
 
-| Layer            | Service             | Responsibility                                                |
-| ---------------- | ------------------- | ------------------------------------------------------------- |
-| DNS Layer        | Pi-hole             | Internal DNS resolution dan ad blocking untuk seluruh network |
-| Ingress Layer    | Nginx Proxy Manager | Reverse proxy, domain routing, dan SSL termination            |
-| Management Layer | Portainer           | Docker environment management dan container administration    |
-| Dashboard Layer  | Homepage            | Centralized dashboard untuk akses seluruh internal service    |
-| Monitoring Layer | Uptime Kuma         | Service health monitoring dan availability tracking           |
-
-
-
+| Layer | Service | Responsibility |
+|---|---|---|
+| DNS Layer | Pi-hole | Internal DNS resolution dan ad blocking untuk seluruh network |
+| Ingress Layer | Nginx Proxy Manager | Reverse proxy, domain routing, dan SSL termination |
+| Management Layer | Portainer | Docker environment management dan container administration |
+| Dashboard Layer | Homepage | Centralized dashboard untuk akses internal service |
+| Monitoring Layer | Uptime Kuma | Service health monitoring dan availability tracking |
 
 ## Hosted Services
 
-| Service             | Purpose                                      |
-| ------------------- | -------------------------------------------- |
-| Pi-hole             | Internal DNS resolver dan ad blocking        |
-| Nginx Proxy Manager | Reverse proxy dan SSL termination            |
-| Portainer           | Docker management interface                  |
-| Homepage            | Internal service dashboard                   |
-| Uptime Kuma         | Service monitoring dan availability checking |
+| Service | Role | Documentation |
+|---|---|---|
+| Pi-hole | DNS resolver & ad blocking | `Services/pihole.md` |
+| Nginx Proxy Manager | Reverse proxy & SSL management | `Services/nginx-proxy-manager.md` |
+| Portainer | Docker management | `Services/portainer.md` |
+| Homepage | Internal dashboard | `Services/homepage.md` |
+| Uptime Kuma | Service monitoring | `Services/uptime-kuma.md` |
 
-LXC 101 memiliki startup priority tertinggi pada Proxmox karena menyediakan DNS dan reverse proxy yang digunakan oleh service lain.
-
-## Dependencies
+## Dependency Relationship
 
 ### Depends On
 
-* Proxmox host dan network availability
+- Proxmox host availability
+- Local network connectivity
+- External DNS (`1.1.1.1`) untuk outbound DNS resolution
 
 ### Required By
 
-* Seluruh LXC dan VM yang menggunakan Pi-hole sebagai DNS.
-* Seluruh internal service yang diakses melalui Nginx Proxy Manager.
+- LXC 102 — Security
+- LXC 103 — Database
+- LXC 104 — Authentication
+- LXC 105 — Productivity
+- VM 100 — Home Assistant OS
+- Seluruh client yang menggunakan internal DNS dan reverse proxy
 
-## Related Services
-
-* `Services/pihole.md`
-* `Services/nginx-proxy-manager.md`
-* `Services/portainer.md`
-* `Services/homepage.md`
-* `Services/uptime-kuma.md`
+LXC 101 memiliki startup priority tertinggi pada Proxmox karena menyediakan DNS dan ingress layer yang menjadi dependency utama bagi seluruh environment.
 
 ## Related Runbooks
 
-* `Runbooks/lxc-ubuntu-post-install.md` — Initial package update, Docker installation, dan base configuration.
-* `Runbooks/pihole-deployment.md` — Deployment dan konfigurasi Pi-hole.
-* `Runbooks/npm-deployment.md` — Deployment Nginx Proxy Manager.
-* `Runbooks/docker-service-deployment.md` — Deployment service berbasis Docker.
+- `Runbooks/lxc-base-setup.md` — Initial LXC setup, package update, Docker installation, dan base configuration.
+- `Runbooks/docker-service-deployment.md` — General Docker service deployment workflow.
 
 ---
 
