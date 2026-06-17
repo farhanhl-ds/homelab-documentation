@@ -1,116 +1,75 @@
-LXC 102 menjalankan Vaultwarden sebagai password manager self-hosted untuk seluruh secret key dan credential homelab.
+# LXC 102 — Security
 
-> **Deploy LXC ini sebelum LXC 103 dan seterusnya** — seluruh secret key dan password yang di-generate saat setup database, Authentik, dan service lain harus langsung disimpan di Vaultwarden.
+LXC 102 merupakan container yang menjalankan layanan keamanan dan secret management dalam environment homelab.
 
-## Specs
+LXC ini harus dideploy sebelum LXC 103 dan service berikutnya agar seluruh credential, password, API key, dan secret yang dihasilkan selama proses setup dapat langsung disimpan secara terpusat di Vaultwarden.
 
-| | |
+## Container Information
+
+| Component | Details |
 |---|---|
 | CT ID | 102 |
-| Hostname | security |
-| OS | Ubuntu 24.04 LTS |
-| CPU | 1 core |
-| RAM | 256MB |
-| Swap | 256MB |
-| Disk | 4GB (local-lvm) |
-| Unprivileged | Yes |
-| Nesting | Yes (Docker) |
+| Hostname | `security` |
+| Operating System | Ubuntu 24.04 LTS |
+| CPU Allocation | 1 core |
+| Memory | 256MB RAM + 256MB Swap |
+| Storage | 4GB (`local-lvm`) |
+| Container Type | Unprivileged LXC |
+| Docker Support | Nesting enabled |
 
-## Network
+## Network Configuration
 
-| | |
+| Configuration | Value |
 |---|---|
-| IP | 192.168.100.102/24 |
-| Gateway | 192.168.100.1 |
-| DNS | 192.168.100.101 |
-| Search domain | homelab.local |
+| IP Address | `192.168.100.102/24` |
+| Gateway | `192.168.100.1` |
+| DNS Server | `192.168.100.101` (Pi-hole) |
+| Search Domain | `homelab.local` |
 
-> Untuk langkah pembuatan LXC step by step, lihat [create-lxc-guide.md](../runbooks/create-lxc-guide.md).
-
----
-
-## Services
-
-### Vaultwarden
-
-| | |
-|---|---|
-| URL | https://vault.homelab.local |
-| Admin panel | https://vault.homelab.local/admin |
-| Path | /opt/stacks/vaultwarden/ |
-
-#### Generate Admin Token
-
-```bash
-openssl rand -base64 48
-```
-
-Simpan output di Vaultwarden setelah setup selesai.
-
-#### docker-compose.yml
-
-```yaml
-services:
-  vaultwarden:
-    image: vaultwarden/server:latest
-    container_name: vaultwarden
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    environment:
-      DOMAIN: "https://vault.homelab.local"
-      SIGNUPS_ALLOWED: "false"
-      ADMIN_TOKEN: "your_admin_token"
-    volumes:
-      - ./data:/data
-
-volumes: {}
-```
-
-> **Catatan:**
-> - `DOMAIN` harus HTTPS dan menggunakan domain yang benar — bukan IP
-> - `SIGNUPS_ALLOWED: false` — akun hanya dapat dibuat via admin panel
-> - `ADMIN_TOKEN` plain text akan memunculkan warning di admin panel — dapat di-hash menggunakan Argon2 (lihat checklist)
-
-#### Deploy
-
-```bash
-cd /opt/stacks/vaultwarden
-docker compose up -d
-docker compose ps
-```
-
-#### Setup Akun Pertama (tanpa SMTP)
-
-Karena SMTP belum dikonfigurasi, invite email tidak dapat dikirim. Workaround:
-
-1. Enable signup sementara: ganti `SIGNUPS_ALLOWED: "false"` → `"true"` → `docker compose up -d --force-recreate`
-2. Buka `https://vault.homelab.local` → Create account
-3. Disable signup kembali: ganti ke `"false"` → `docker compose up -d --force-recreate`
-
-#### Import Password dari Chrome
-
-1. Chrome → Settings → Password Manager → Export passwords → simpan `.csv`
-2. Vaultwarden → Tools → Import → pilih format **Chrome** → upload CSV → Import
-3. Hapus file CSV setelah import selesai — file ini berisi password dalam format plaintext
+DNS dan akses HTTPS untuk Vaultwarden bergantung pada layanan yang disediakan oleh LXC 101 — Core Infrastructure.
 
 ---
 
-## Post-Deploy Checklist
+## Service Architecture
 
-- [x] Vaultwarden accessible di `https://vault.homelab.local`
-- [x] Admin panel accessible di `https://vault.homelab.local/admin`
-- [x] `DOMAIN` diset ke HTTPS
-- [x] Akun pertama dibuat
-- [x] `SIGNUPS_ALLOWED` dikembalikan ke `false`
-- [x] Password Chrome di-import ke Vaultwarden
-- [x] Bitwarden extension terinstall dan pointing ke self-hosted
-- [x] SSL via NPM aktif (cert `homelab-local`)
-- [ ] Hash `ADMIN_TOKEN` menggunakan Argon2
-- [ ] Setup SMTP
-- [ ] Enable 2FA
-- [ ] Setup backup otomatis
+LXC 102 menyediakan security layer untuk penyimpanan credential dan secret dalam environment homelab.
+
+```text
+        LXC 102 — Security
+                 |
+          Security Layer
+                 |
+            Vaultwarden
+```
+
+## Hosted Services
+
+| Service | Role | Documentation |
+|---|---|---|
+| Vaultwarden | Password manager dan secret storage | `Services/vaultwarden.md` |
+
+## Dependency Relationship
+
+### Depends On
+
+- LXC 101 — Core Infrastructure
+  - Pi-hole untuk internal DNS resolution
+  - Nginx Proxy Manager untuk HTTPS reverse proxy
+
+### Required By
+
+- LXC 103 — Database (database password dan credential)
+- LXC 104 — Authentication (secret key dan application credential)
+- LXC 105 — Productivity (API key dan service credential)
+- Homelab administrator untuk password dan secret management
+
+LXC 102 memiliki startup priority setelah LXC 101 karena membutuhkan DNS dan reverse proxy yang disediakan oleh core infrastructure.
+
+## Related Runbooks
+
+- `Runbooks/lxc-base-setup.md` — Initial LXC setup, package update, Docker installation, dan base configuration.
+- `Runbooks/vaultwarden-deployment.md` — Vaultwarden deployment, initial setup, dan account creation.
 
 ---
 
-*Last updated: 2026-06-16*
+*Last updated: 2026-06-17*

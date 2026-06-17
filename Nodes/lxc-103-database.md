@@ -1,197 +1,99 @@
-LXC 103 menjalankan PostgreSQL, Redis, dan Adminer sebagai pusat database untuk seluruh service homelab.
+# LXC 103 — Database
 
-> **Pastikan LXC 102 (Vaultwarden) sudah running** sebelum deploy LXC ini — seluruh password database yang di-generate harus langsung disimpan di Vaultwarden.
+LXC 103 merupakan container yang menyediakan data layer untuk seluruh environment homelab melalui layanan PostgreSQL, Redis, dan database administration tool.
 
-## Specs
+LXC ini sebaiknya dideploy setelah LXC 102 — Security agar seluruh database credential, Redis password, dan secret lain yang dihasilkan selama proses setup dapat langsung disimpan secara terpusat di Vaultwarden.
 
-| | |
+## Container Information
+
+| Component | Details |
 |---|---|
 | CT ID | 103 |
-| Hostname | database |
-| OS | Ubuntu 24.04 LTS |
-| CPU | 2 cores |
-| RAM | 1024MB |
-| Swap | 512MB |
-| Disk | 16GB (local-lvm) |
-| Unprivileged | Yes |
-| Nesting | Yes (Docker) |
+| Hostname | `database` |
+| Operating System | Ubuntu 24.04 LTS |
+| CPU Allocation | 2 cores |
+| Memory | 1024MB RAM + 512MB Swap |
+| Storage | 16GB (`local-lvm`) |
+| Container Type | Unprivileged LXC |
+| Docker Support | Nesting enabled |
 
-## Network
+## Network Configuration
 
-| | |
+| Configuration | Value |
 |---|---|
-| IP | 192.168.100.103/24 |
-| Gateway | 192.168.100.1 |
-| DNS | 192.168.100.101 |
-| Search domain | homelab.local |
+| IP Address | `192.168.100.103/24` |
+| Gateway | `192.168.100.1` |
+| DNS Server | `192.168.100.101` (Pi-hole) |
+| Search Domain | `homelab.local` |
 
-> Untuk langkah pembuatan LXC step by step, lihat [create-lxc-guide.md](../runbooks/create-lxc-guide.md).
+Akses HTTPS untuk database administration menggunakan layanan reverse proxy yang disediakan oleh LXC 101 — Core Infrastructure.
 
 ---
 
-## Services
+## Service Architecture
 
-### PostgreSQL 16 + Redis + Adminer
+LXC 103 menyediakan data layer yang terdiri dari database server, in-memory datastore, dan administration interface.
 
-| Service | Port | URL |
+```text
+          LXC 103 — Database
+                    |
+               Data Layer
+                    |
+        ┌───────────┼───────────┐
+        |           |           |
+   PostgreSQL      Redis      Adminer
+        |           |           |
+ Persistent      Cache &     Database
+   Storage       Session    Administration
+```
+
+Setiap service memiliki tanggung jawab yang berbeda:
+
+| Layer | Service | Responsibility |
 |---|---|---|
-| PostgreSQL | 5432 | — (internal only) |
-| Redis | 6379 | — (internal only) |
-| Adminer | 8080 | https://adminer.homelab.local |
+| Database | PostgreSQL | Relational database untuk persistent application data |
+| Cache | Redis | In-memory datastore untuk cache, session, dan temporary data |
+| Administration | Adminer | Web interface untuk database management dan verification |
 
-Path: `/opt/stacks/database/`
+## Hosted Services
 
-### .env
+| Service | Role | Documentation |
+|---|---|---|
+| PostgreSQL | Relational database server | `Services/postgresql.md` |
+| Redis | In-memory datastore dan cache | `Services/redis.md` |
+| Adminer | Database administration interface | `Services/adminer.md` |
 
-```bash
-nano /opt/stacks/database/.env
-```
+## Dependency Relationship
 
-```env
-POSTGRES_PASSWORD=your_superuser_password
-REDIS_PASSWORD=your_redis_password
-```
+### Depends On
 
-> Simpan kedua password ini di Vaultwarden → folder Homelab → Note "Database Credentials".
+- LXC 101 — Core Infrastructure
+  - Pi-hole untuk internal DNS resolution
+  - Nginx Proxy Manager untuk HTTPS access ke Adminer
 
-### docker-compose.yml
+- LXC 102 — Security
+  - Vaultwarden untuk penyimpanan database credential dan secret
 
-```yaml
-services:
-  postgres:
-    image: postgres:16
-    container_name: postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
+### Required By
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - ./redisdata:/data
-    ports:
-      - "6379:6379"
+- LXC 104 — Authentication
+  - PostgreSQL untuk Authentik database
+  - Redis untuk cache dan session storage
 
-  adminer:
-    image: adminer:latest
-    container_name: adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
+- LXC 105 — Productivity
+  - PostgreSQL dan Redis untuk aplikasi yang membutuhkan data storage
 
-volumes: {}
-```
+- Database administrator melalui Adminer untuk database management dan troubleshooting
 
-> Password PostgreSQL dan Redis menggunakan `.env` file — tidak hardcode di dalam yaml.
+LXC 103 memiliki startup priority setelah LXC 102 karena database credential dan secret management harus tersedia sebelum provisioning database baru.
 
-### init.sql
+## Related Runbooks
 
-```bash
-nano /opt/stacks/database/init/init.sql
-```
-
-```sql
--- Authentik
-CREATE USER authentik_user WITH PASSWORD 'authentik_password';
-CREATE DATABASE db_authentik OWNER authentik_user;
-
--- Outline
-CREATE USER outline_user WITH PASSWORD 'outline_password';
-CREATE DATABASE db_outline OWNER outline_user;
-
--- Postiz
-CREATE USER postiz_user WITH PASSWORD 'postiz_password';
-CREATE DATABASE db_postiz OWNER postiz_user;
-
--- Umami
-CREATE USER umami_user WITH PASSWORD 'umami_password';
-CREATE DATABASE db_umami OWNER umami_user;
-```
-
-> `init.sql` hanya dieksekusi sekali saat volume PostgreSQL masih kosong. Password di sini hardcoded karena PostgreSQL tidak mendukung environment variable di init script. Simpan seluruh password di Vaultwarden.
-
-### Deploy
-
-```bash
-cd /opt/stacks/database
-docker compose up -d
-docker compose ps
-```
-
-### Verifikasi via Adminer
-
-Buka `https://adminer.homelab.local`, login:
-
-| Field | Value |
-|---|---|
-| System | PostgreSQL |
-| Server | postgres |
-| Username | postgres |
-| Password | (superuser password) |
-| Database | (kosongkan) |
-
-Konfirmasi `db_authentik`, `db_outline`, `db_postiz`, `db_umami` muncul di daftar database.
+- `Runbooks/lxc-base-setup.md` — Initial LXC setup, package update, Docker installation, dan base configuration.
+- `Runbooks/postgresql-deployment.md` — PostgreSQL deployment dan initial database provisioning.
+- `Runbooks/redis-deployment.md` — Redis deployment dan password configuration.
+- `Runbooks/adminer-deployment.md` — Adminer deployment dan initial access configuration.
 
 ---
 
-### Redis Database Index Convention
-
-| Service | Redis DB Index |
-|---|---|
-| Outline | 0 |
-| Postiz | 1 |
-| Authentik | 2 |
-| (reserved) | 3+ |
-
----
-
-## Tambah Database Baru
-
-Apabila `init.sql` sudah pernah dieksekusi (volume tidak kosong), tambah database baru via:
-
-```bash
-docker exec -it postgres psql -U postgres
-```
-
-```sql
-CREATE USER new_user WITH PASSWORD 'new_password';
-CREATE DATABASE db_new OWNER new_user;
-\q
-```
-
----
-
-## Akses dari LXC Lain
-
-| Service | Connection String |
-|---|---|
-| PostgreSQL | `postgresql://user:password@192.168.100.103:5432/db_name` |
-| Redis | `redis://:your_redis_password@192.168.100.103:6379/db_index` |
-
----
-
-## Post-Deploy Checklist
-
-- [x] Semua container running (postgres, redis, adminer)
-- [x] Semua database terbuat (db_authentik, db_outline, db_postiz, db_umami)
-- [x] Semua password disimpan di Vaultwarden (Note: Database Credentials)
-- [x] Adminer accessible di `https://adminer.homelab.local`
-- [x] Test koneksi dari LXC 104 (Authentik)
-- [x] Test koneksi dari LXC 105 (Outline)
-- [ ] Test koneksi dari LXC 106 (Postiz)
-
----
-
-*Last updated: 2026-06-16*
+*Last updated: 2026-06-17*
