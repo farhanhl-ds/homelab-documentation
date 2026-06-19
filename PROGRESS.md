@@ -1,164 +1,255 @@
 # Homelab Progress & Session Log
 
-File ini digunakan untuk tracking progress deployment homelab. Diperbarui setiap kali terdapat progress signifikan.
+High-level dashboard untuk tracking status homelab, progress dokumentasi, dan milestone project.
+
+Dokumentasi teknis detail tersedia pada folder `Infrastructure`, `Nodes`, `Services`, dan `Runbooks`.
 
 ---
 
-## Current State (2026-06-15)
+# Project Status
 
-### Sudah Selesai ✅
+## Infrastructure
 
-**LXC 101 — core-infra (192.168.100.101)**
-- Docker terinstall
-- Semua service running: Portainer, Pihole, NPM, Homepage, Uptime Kuma
-- Pihole `listeningMode` diubah ke `ALL` (fix DNS dari LAN)
-- DNS records + CNAME records sudah dikonfigurasi di Pihole untuk semua domain `.homelab.local`
-- SSL self-signed wildcard `*.homelab.local` sudah di-generate dan di-upload ke NPM
-- Semua proxy hosts sudah dikonfigurasi di NPM dengan HTTPS
-- Homepage `HOMEPAGE_ALLOWED_HOSTS` sudah diset via environment variable
-- VS Code Remote SSH sudah dikonfigurasi dari desktop Windows ke LXC ini
-
-**LXC 102 — security (192.168.100.102)**
-- Docker terinstall
-- Vaultwarden running dan fully functional
-- `DOMAIN` diset ke `https://vault.homelab.local`
-- SSL via NPM sudah aktif (cert `homelab-local`)
-- Akun pertama sudah dibuat
-- `SIGNUPS_ALLOWED` dikembalikan ke `false`
-- Bitwarden extension terinstall di Chrome, pointing ke `https://vault.homelab.local`
-- Password dari Chrome sudah di-import ke Vaultwarden
-
-**LXC 103 — database (192.168.100.103)**
-- PostgreSQL 16 + Redis + Adminer running
-- Semua database terbuat: `db_authentik`, `db_outline`, `db_postiz`, `db_umami`
-- Password menggunakan `.env` file (tidak hardcode di docker-compose)
-- Password `outline_user` diganti ke hex-only (tanpa special characters) — tersimpan di Vaultwarden
-- Redis password diganti ke hex-only — tersimpan di Vaultwarden
-- Adminer accessible di `https://adminer.homelab.local`
-
-**LXC 104 — auth (192.168.100.104)**
-- Authentik server + worker running
-- Permission media folder diperbaiki: `chown -R 1000:1000 ./media ./custom-templates ./certs`
-- Admin account (`akadmin`) dibuat via initial-setup
-- Brands domain diset ke `auth.homelab.local`
-- `AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=192.168.100.0/24` dikonfigurasi di `.env`
-- NPM proxy host dengan Custom Nginx Config (X-Forwarded headers) — wajib agar UI render dengan benar
-- OIDC provider `outline-provider` dibuat, Client ID & Secret tersimpan di Vaultwarden
-- Application `Outline` (slug: `outline`) dibuat dan linked ke provider
-
-**LXC 105 — productivity (192.168.100.105)**
-- Outline running dan accessible di `https://outline.homelab.local`
-- Login via Authentik SSO berhasil
-- `dns: 192.168.100.101` dikonfigurasi di docker-compose agar container dapat resolve `auth.homelab.local`
-- `NODE_TLS_REJECT_UNAUTHORIZED: "0"` dikonfigurasi untuk trust self-signed cert
-- `OIDC_AUTH_URI` menggunakan endpoint yang benar: `https://auth.homelab.local/application/o/authorize/`
-
-**Network & Infrastructure**
-- DNS laptop: IPv6 disabled di adapter Wi-Fi, IPv4 DNS → `192.168.100.101`
-- Semua domain `*.homelab.local` sudah resolve via Pihole
-- SSL self-signed cert (`homelab.crt` + `homelab.key`) tersimpan di `/opt/stacks/npm/` di LXC 101
-- File cert juga tersimpan di `C:\Users\Farhan\Downloads\` di laptop
+| Component | Status |
+|---|---|
+| Proxmox Host | ✅ Completed |
+| Network & DNS | ✅ Completed |
+| SSL Self-Signed Certificate | ✅ Completed |
+| Docker Environment | ✅ Completed |
+| Backup Strategy | ✅ Documented |
 
 ---
 
-### Belum Selesai 🔲
+## Services
 
-| LXC / VM | Services | Status |
+| Service | Status |
+|---|---|
+| Pi-hole | ✅ Running |
+| Nginx Proxy Manager | ✅ Running |
+| Homepage | ✅ Running |
+| Uptime Kuma | 🟡 Running — Monitoring belum dikonfigurasi penuh |
+| Portainer | ✅ Running |
+| Vaultwarden | 🟡 Running — Security hardening masih diperlukan |
+| PostgreSQL | ✅ Running |
+| Redis | ✅ Running |
+| Adminer | ✅ Running |
+| Authentik | ✅ Running |
+| Outline | ✅ Running (SSO Authentik) |
+| Stirling PDF | ✅ Running |
+| Postiz | ✅ Running |
+| Home Assistant | 🔲 Pending Deployment |
+| Tailscale | 🔲 Pending Configuration |
+
+---
+
+# LXC & VM Status
+
+| Node | Role | Status |
 |---|---|---|
-| LXC 105 — productivity | Stirling PDF | 🔲 Pending |
-| LXC 105 — productivity | Postiz | 🔲 Pending |
-| VM 100 — HAOS | Home Assistant | 🔲 Pending |
-| Network | Tailscale | 🔲 Pending |
+| LXC 101 | Core Infrastructure | ✅ Production |
+| LXC 102 | Security | ✅ Production |
+| LXC 103 | Database | ✅ Production |
+| LXC 104 | Authentication | ✅ Production |
+| LXC 105 | Productivity | ✅ Production |
+| VM 100 | Home Assistant OS | 🔲 Not Configured |
 
 ---
 
-### Next Steps
+# Documentation Status
 
-1. **Deploy Stirling PDF** di LXC 105
-2. **Deploy Postiz** di LXC 105
-3. **Setup VM 100 — Home Assistant**
-4. **Setup Tailscale** — remote access dari luar jaringan
+| Category | Status |
+|---|---|
+| Architecture | ✅ Completed |
+| Infrastructure | ✅ Completed |
+| Nodes | ✅ Completed |
+| Services | ✅ Completed |
+| Runbooks — Deployment | ✅ Completed |
+| Runbooks — Configuration | ✅ Completed |
+| Runbooks — Administration | ✅ Completed |
+| Runbooks — Operations | ✅ Completed |
+| Runbooks — Troubleshooting | 🔥 In Progress (Final Boss) |
 
 ---
 
-## Konfigurasi Penting
+# Current Priorities
 
-### SSH Config (`C:\Users\Farhan\.ssh\config`)
+## High Priority
 
-```
-Host core-infra
-    HostName 192.168.100.101
-    User root
-    IdentityFile ~/.ssh/id_ed25519
+- Complete `Runbooks/Troubleshooting`
+- Deploy and configure Home Assistant VM
+- Configure Tailscale remote access
 
-Host security
-    HostName 192.168.100.102
-    User root
-    IdentityFile ~/.ssh/id_ed25519
+---
 
-Host database
-    HostName 192.168.100.103
-    User root
-    IdentityFile ~/.ssh/id_ed25519
+## Medium Priority
 
-Host auth
-    HostName 192.168.100.104
-    User root
-    IdentityFile ~/.ssh/id_ed25519
+- Configure Uptime Kuma monitors
+- Configure Homepage widgets
+- Implement Vaultwarden `ADMIN_TOKEN` Argon2 hash
+- Configure SMTP untuk Vaultwarden
 
-Host productivity
-    HostName 192.168.100.105
-    User root
-    IdentityFile ~/.ssh/id_ed25519
+---
+
+## Low Priority
+
+- Review backup automation
+- Review update schedule
+- Improve service monitoring dashboard
+
+---
+
+# Important Quick References
+
+## SSH Access
+
+SSH host aliases sudah dikonfigurasi pada:
+
+```text
+C:\Users\Farhan\.ssh\config
 ```
 
-### SSL Certificate
-- Di server: `/opt/stacks/npm/homelab.crt` dan `/opt/stacks/npm/homelab.key` (LXC 101)
-- Di laptop: `C:\Users\Farhan\Downloads\homelab.crt` dan `homelab.key`
-- Valid 10 tahun (expire ~2036), wildcard `*.homelab.local`
+---
 
-### Vaultwarden Admin
-- URL: `https://vault.homelab.local/admin`
-- Token: tersimpan di docker-compose `/opt/stacks/vaultwarden/docker-compose.yml` di LXC 102
+## SSL Certificate
 
-### DNS Windows (Laptop)
-- IPv6: disabled di adapter Wi-Fi
-- IPv4 DNS: `192.168.100.101` (Pihole), alternate `1.1.1.1`
-- Command untuk re-apply apabila reset:
-  ```powershell
-  Set-DnsClientServerAddress -InterfaceIndex 19 -ServerAddresses ("192.168.100.101","1.1.1.1")
-  ```
+Wildcard certificate:
+
+```text
+*.homelab.local
+```
+
+Lokasi:
+
+Server:
+```text
+/opt/stacks/npm/homelab.crt
+/opt/stacks/npm/homelab.key
+```
+
+Laptop:
+```text
+C:\Users\Farhan\Downloads\
+```
 
 ---
 
-## Known Issues
+## Windows DNS Recovery
 
-| Issue | Priority | Catatan |
+Apabila konfigurasi DNS Windows ter-reset:
+
+```powershell
+Set-DnsClientServerAddress `
+  -InterfaceIndex 19 `
+  -ServerAddresses ("192.168.100.101", "1.1.1.1")
+```
+
+---
+
+# Known Issues & Improvements
+
+| Item | Priority | Status |
 |---|---|---|
-| `ADMIN_TOKEN` Vaultwarden masih plain text | Low | Perlu di-hash menggunakan Argon2 |
-| SMTP Vaultwarden belum dikonfigurasi | Low | Invite user harus manual via `SIGNUPS_ALLOWED` sementara |
-| Uptime Kuma belum dikonfigurasi monitors | Low | — |
-| Homepage belum dikonfigurasi widgets | Low | — |
+| Vaultwarden `ADMIN_TOKEN` masih plain text | Low | Pending |
+| SMTP Vaultwarden belum dikonfigurasi | Low | Pending |
+| Uptime Kuma monitor belum dibuat | Medium | Pending |
+| Homepage widgets belum dikonfigurasi | Medium | Pending |
+| Home Assistant belum dikonfigurasi | High | Pending |
+| Tailscale belum dikonfigurasi | High | Pending |
 
 ---
 
-## Session Log
+# Session Log
 
-### 2026-06-14
-- Setup VS Code Remote SSH ke LXC 101 (core-infra)
-- Debug DNS `.homelab.local` — root cause: Windows IPv6 + Pihole `listeningMode LOCAL`
-- Setup SSL self-signed wildcard `*.homelab.local`
-- Deploy dan setup Vaultwarden di LXC 102
-- Import passwords Chrome → Vaultwarden
-- Setup Bitwarden extension pointing ke self-hosted
+## 2026-06-14 — Foundation Phase
 
-### 2026-06-15
-- Deploy LXC 104 — Authentik (fix permission media, Redis password, trusted proxy CIDRs)
-- Setup NPM proxy host Authentik dengan Custom Nginx Config
-- Deploy LXC 105 — Outline, fully working via SSO Authentik
-- Fix: special characters di password, ENOTFOUND DNS, self-signed cert, OIDC auth URI
-- Outline accessible di `https://outline.homelab.local`
+- Setup VS Code Remote SSH
+- Debug DNS `.homelab.local`
+- Fix Pi-hole listening mode
+- Disable Windows IPv6 untuk menghindari DNS conflict
+- Generate SSL wildcard `*.homelab.local`
+- Deploy Vaultwarden
+- Migrasi password Chrome ke Vaultwarden
 
 ---
 
-*Last updated: 2026-06-17*
+## 2026-06-15 — Identity & Knowledge Base Phase
+
+- Deploy Authentik
+- Fix permission dan trusted proxy configuration
+- Configure Authentik melalui Nginx Proxy Manager
+- Deploy Outline
+- Integrasi SSO menggunakan Authentik OIDC
+- Debug OIDC endpoint, DNS resolution, dan self-signed certificate issue
+
+---
+
+## 2026-06-16 — Productivity Expansion Phase
+
+- Deploy Stirling PDF
+- Deploy Postiz
+- Konfigurasi reverse proxy dan HTTPS endpoint
+
+---
+
+## 2026-06-17 — Documentation Consolidation Phase
+
+- Membuat struktur dokumentasi repository:
+  - Architecture
+  - Infrastructure
+  - Nodes
+  - Services
+  - Runbooks
+- Memisahkan deployment, configuration, dan operational documentation
+
+---
+
+## 2026-06-18 — Operations & Recovery Phase
+
+- Membuat operational runbooks:
+  - Health Check
+  - Monitoring
+  - Shutdown Procedure
+  - Power Recovery
+  - Backup & Restore
+  - Service Migration
+
+---
+
+## 2026-06-19 — Repository Finalization Phase
+
+- Review konsistensi naming documentation
+- Refactor `PROGRESS.md` menjadi project dashboard
+- Review seluruh repository structure
+- Menyiapkan final extraction untuk troubleshooting documentation
+
+---
+
+# Project Completion
+
+```text
+Homelab Infrastructure     ████████████████████ 95%
+Documentation Repository   ███████████████████░ 90%
+Overall Project            ███████████████████░ 92%
+```
+
+---
+
+# Next Milestone
+
+## 🔥 Final Documentation Phase
+
+Complete `Runbooks/Troubleshooting` extraction dari legacy troubleshooting document.
+
+Setelah selesai:
+
+- Documentation repository mencapai tahap production-ready
+- Seluruh deployment history telah terdokumentasi
+- Operational recovery procedure telah tersedia
+
+---
+
+*"A homelab is not finished when it works. It is finished when future you can fix it at 3 AM without guessing."*
+
+---
+
+*Last updated: 2026-06-19*

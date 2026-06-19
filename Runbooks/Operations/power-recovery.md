@@ -6,6 +6,13 @@ Tujuan runbook ini adalah memastikan seluruh LXC dan service kembali berjalan se
 
 ---
 
+## Related Documents
+
+- `Infrastructure/proxmox.md`
+- `Runbooks/disaster-recovery.md`
+
+---
+
 ## Expected Startup Order
 
 LXC harus berjalan dengan urutan berikut:
@@ -16,13 +23,9 @@ LXC harus berjalan dengan urutan berikut:
 | 2 | LXC 102 | Security | Vaultwarden bergantung pada DNS |
 | 3 | LXC 103 | Database | PostgreSQL dan Redis untuk service lain |
 | 4 | LXC 104 | Authentication | Authentik bergantung pada database |
-| 5 | LXC 105 | Productivity | Outline, Postiz, dan aplikasi lain |
+| 5 | LXC 105 | Productivity | Outline, Stirling PDF, Postiz, dan aplikasi lain |
 
 Konfigurasi ini diatur melalui Proxmox `onboot` startup order.
-
-Referensi:
-
-- `../../Infrastructure/proxmox.md`
 
 ---
 
@@ -34,12 +37,13 @@ Login ke Proxmox host:
 ssh root@192.168.100.10
 ```
 
-Verifikasi host berjalan normal:
+Verifikasi kondisi host:
 
 ```bash
 uptime
 hostname
 df -h
+systemctl status pve-cluster
 ```
 
 Pastikan:
@@ -47,6 +51,7 @@ Pastikan:
 - Tidak ada disk penuh
 - Load tidak abnormal
 - Hostname adalah `haytham`
+- Service `pve-cluster` berjalan normal
 
 ---
 
@@ -69,13 +74,29 @@ VMID STATUS
 105  running
 ```
 
+Verifikasi konfigurasi auto start:
+
+```bash
+for id in 101 102 103 104 105; do
+  echo "LXC $id"
+  pct config $id | grep -E "onboot|startup"
+done
+```
+
+Expected:
+
+```text
+onboot: 1
+startup: order=x,up=x
+```
+
 ---
 
 ## Phase 3 — Manual Startup (Jika Auto Start Gagal)
 
-Jalankan container sesuai dependency.
+Jalankan container sesuai dependency order.
 
-### Core Infrastructure
+### LXC 101 — Core Infrastructure
 
 ```bash
 pct start 101
@@ -90,13 +111,13 @@ pct status 101
 
 Expected:
 
-```
+```text
 status: running
 ```
 
 ---
 
-### Security
+### LXC 102 — Security
 
 ```bash
 pct start 102
@@ -105,7 +126,7 @@ sleep 20
 
 ---
 
-### Database
+### LXC 103 — Database
 
 ```bash
 pct start 103
@@ -114,7 +135,7 @@ sleep 20
 
 ---
 
-### Authentication
+### LXC 104 — Authentication
 
 ```bash
 pct start 104
@@ -123,7 +144,7 @@ sleep 10
 
 ---
 
-### Productivity
+### LXC 105 — Productivity
 
 ```bash
 pct start 105
@@ -146,7 +167,7 @@ exit
 Expected:
 
 - pihole
-- npm
+- nginx-proxy-manager
 - homepage
 - uptime-kuma
 - portainer
@@ -220,25 +241,40 @@ Core infrastructure harus diperiksa terlebih dahulu karena menjadi dependency se
 
 ### DNS (Pi-hole)
 
-Test DNS resolution dari LXC lain:
+Masuk ke LXC lain untuk melakukan DNS test:
 
 ```bash
 pct enter 102
+```
 
-ping auth.homelab.local
+Test resolusi domain:
 
-exit
+```bash
+nslookup auth.homelab.local 192.168.100.101
 ```
 
 Expected:
 
+```text
+Name: auth.homelab.local
+Address: 192.168.100.104
 ```
-PING auth.homelab.local (192.168.100.104)
+
+Tambahan test connectivity:
+
+```bash
+ping auth.homelab.local
+```
+
+Keluar dari LXC:
+
+```bash
+exit
 ```
 
 ---
 
-### Reverse Proxy
+### Reverse Proxy (Nginx Proxy Manager)
 
 Akses:
 
@@ -279,7 +315,7 @@ https://uptime.homelab.local
 
 Pastikan seluruh monitor berstatus:
 
-```
+```text
 UP
 ```
 
@@ -311,13 +347,13 @@ Masuk ke LXC:
 pct enter <CT_ID>
 ```
 
-Lihat container:
+Lihat seluruh container:
 
 ```bash
 docker ps -a
 ```
 
-Lihat log:
+Lihat log container:
 
 ```bash
 docker logs <container_name>
@@ -333,27 +369,37 @@ docker restart <container_name>
 
 ### DNS tidak bekerja
 
-Pastikan Pi-hole running:
+Pastikan Pi-hole berjalan:
 
 ```bash
 pct enter 101
 docker ps
+exit
 ```
 
-Cek konfigurasi DNS LXC:
+Cek DNS resolver pada LXC:
 
 ```bash
 cat /etc/resolv.conf
+```
+
+Pastikan DNS mengarah ke:
+
+```text
+192.168.100.101
 ```
 
 ---
 
 ## Recovery Complete Checklist
 
-### Proxmox
+### Proxmox Host
 
 - [ ] Host berjalan normal
 - [ ] Storage tidak penuh
+- [ ] pve-cluster berjalan normal
+
+---
 
 ### LXC
 
@@ -362,6 +408,8 @@ cat /etc/resolv.conf
 - [ ] LXC 103 running
 - [ ] LXC 104 running
 - [ ] LXC 105 running
+
+---
 
 ### Services
 
@@ -381,15 +429,15 @@ cat /etc/resolv.conf
 Pastikan konfigurasi auto start tetap aktif:
 
 ```bash
-pct config 101 | grep startup
+for id in 101 102 103 104 105; do
+  pct config $id | grep -E "onboot|startup"
+done
 ```
 
-Konfigurasi startup order dapat dilihat pada:
+Konfigurasi startup order lebih detail dapat dilihat pada:
 
-```
-Infrastructure/proxmox.md
-```
+- `Infrastructure/proxmox.md`
 
 ---
 
-*Last updated: 2026-06-18*
+*Last updated: 2026-06-19*
