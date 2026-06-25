@@ -1,0 +1,12 @@
+# Terraform state — jangan di-commit, berisi sensitive data
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
+
+# Variable files yang berisi credential
+terraform.tfvars
+*.tfvars
+!*.tfvars.example
